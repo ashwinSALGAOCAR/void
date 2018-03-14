@@ -1,2 +1,2 @@
 # void
-dump of few ideas I need working on.
+#dump of ideas I am working on.
