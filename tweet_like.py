@@ -1,4 +1,4 @@
-#code to fetch a particular users Tweets in the last 24 hours and liking it if not liked before.
+#CODE to fetch a particular users Tweets in the last 24 hours and liking it if not liked before.
 import tweepy, datetime, time, pytz
 from config import access_key, access_secret, consumer_key, consumer_secret
 
