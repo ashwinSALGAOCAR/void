@@ -4,14 +4,14 @@ from config import access_key, access_secret, consumer_key, consumer_secret, tel
 
 #Fetch the Twitter keys and secrets for the script ti access Twitter.
 
-auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-auth.set_access_token(access_key, access_secret)
+AUTH = tweepy.OAuthHandler(consumer_key, consumer_secret)
+AUTH.set_access_token(access_key, access_secret)
 
-api = tweepy.API(auth)
+API = tweepy.API(auth)
 
 #Fetch the Telegram token for the script to access Telegram.
 
-bot = telegram.Bot(token=telegram_PIN)
+BOT = telegram.Bot(token=telegram_PIN)
 
 
 #My Details.
@@ -21,9 +21,9 @@ bot = telegram.Bot(token=telegram_PIN)
 #print('Location: ' + user.location)
 #print('Friends: ' + str(user.friends_count))
 
+CONFIG_FILE = 'users.yaml'
 
-
-def get_tweets(api, username):
+def get_tweets(username):
 #    request = requests.get(url, stream=True)
 #    print request
     page = 1
@@ -33,7 +33,11 @@ def get_tweets(api, username):
     
     while True:
 
-        for tweet in tweepy.Cursor(api.user_timeline, username, page = page, include_entities = True, tweet_mode='extended').items():
+        for tweet in tweepy.Cursor(API.user_timeline,
+                                   username,
+                                   page = page,
+                                   include_entities = True,
+                                   tweet_mode='extended').items():
             #Do processing here:
             #24 hour Format.
             fmt1 = '%Y-%m-%d %H:%M:%S'
@@ -45,60 +49,45 @@ def get_tweets(api, username):
             utc_date=utc.localize(tweet.created_at)
             ist_date  = utc_date.astimezone(ist)
 
-            
+
             if (datetime.datetime.now() - tweet.created_at).days <= 1:
-                
-#                print utc
-#                print ist
-#                print utc_date
-#                print ist_date
-                #Fetching the Users Twitter Handle. Ex: @ashwinSALGAOCAR
-                #and the Tweet ID
 
-                tw_handle = '@' + api.get_user(tweet.user.id_str).screen_name
+                tw_handle = '@' + API.get_user(tweet.user.id_str).screen_name
                 #If the Tweet is a ReTweet, it gets truncated, hence we print the tweet._json
+                no_url = '\n\nNo Urls in this Tweet.'
+                message = "\n\nLike/Retweet/Comment at https://twitter.com/{0}/status/{1}"
+                visit_link = "\n\nOr visit the link in the {0} directly via: "
+
                 if 'retweeted_status' in tweet._json:
-                     retweet_text = tw_handle +' retweeted @' + api.get_user(tweet.retweeted_status.user.id_str).screen_name          #Appends RT @ to the Retweet.
 
-                     #If the tweet is not Liked/Favorited, then only Like/Favorite the tweet.
-#                     try:
-#                         if not tweet.favorite():
-#                             tweet.favorite()
-#                             print('You Liked the Retweet')
-#                     except tweepy.TweepError as e:
-#                         print('You have already Liked/Favorited the Retweet')
+                    screen_name, tweet_id = get_tweet_details(tweet.retweeted_status)
 
-                     if tweet.retweeted_status.entities['urls']:
-                         for url in tweet.retweeted_status.entities['urls']:
-                             StoryUrl = "\n\nLike/Retweet/Comment at https://twitter.com/"+api.get_user(tweet.retweeted_status.user.id_str).screen_name+"/status/"+tweet.retweeted_status.id_str+"\n\nOr visit the link in the Retweet directly via: "+url['expanded_url']
-                     else:
-                         StoryUrl ="\n\nLike/Retweet/Comment at https://twitter.com/"+api.get_user(tweet.retweeted_status.user.id_str).screen_name+"/status/"+tweet.retweeted_status.id_str+'\n\nNo Urls in this Retweet.'
- 
-                     RT_likes = tweet.retweeted_status.favorite_count
-                     status = ist_date.strftime(fmt) +"\n"+ (retweet_text +"\n"+ tweet._json['retweeted_status']['full_text']) + ("\nLikes: ") +str(RT_likes) +"\n"+str(tweet.display_text_range)+ StoryUrl
-                    
-                     bot.send_message(chat_id="@ReTweet_channel", text=status, parse_mode=telegram.ParseMode.HTML)
+                    retweet_text = tw_handle +' retweeted @' + screen_name          #Appends RT @ to the Retweet.
+
+                    if tweet.retweeted_status.entities['urls']:
+                        for url in tweet.retweeted_status.entities['urls']:
+                            StoryUrl = message + visit_link.format("Retweet") + url['expanded_url']
+                    else:
+                        StoryUrl = message + no_url
+
+                    likes = tweet.retweeted_status.favorite_count
 
                 #Else if it is a Tweet, simply paste the full text.
                 else:
 
-                     #If the tweet is not Liked/Favorited, then only Like/Favorite the tweet.
-#                     try:
-#                         if not tweet.favorite():
-#                             tweet.favorite()
-#                             print('You Liked the Tweet') 
-#                     except tweepy.TweepError as e:
-#                         print('You have already Liked/Favorited the Tweet')
+                    screen_name = API.get_user(tweet.user.id_str).screen_name
+                    tweet_id = tweet.id_str
+
                     if tweet.entities['urls']:
                          for url in tweet.entities['urls']:
-                             StoryUrl = "\n\nLike/Retweet/Comment at https://twitter.com/"+api.get_user(tweet.user.id_str).screen_name+"/status/"+tweet.id_str+"\n\nOr visit the link in the Tweet directly via: "+url['expanded_url']
+                             StoryUrl = message + visit_link.format("Tweet") + url['expanded_url']
                     else:
-                        StoryUrl = "\n\nLike/Retweet/Comment at https://twitter.com/"+api.get_user(tweet.user.id_str).screen_name+"/status/"+tweet.id_str+'\n\nNo Urls in this Tweet.'
+                        StoryUrl = message + no_url
 
-                    T_likes = tweet.favorite_count
-                    status = ist_date.strftime(fmt) +"\n"+ (tw_handle +"\n"+ tweet.full_text)+ ("\nLikes:")+str(T_likes) +"\n"+ str(tweet.display_text_range)+ StoryUrl
+                    likes = tweet.favorite_count
 
-                    bot.send_message(chat_id="@ReTweet_channel", text=status, parse_mode=telegram.ParseMode.HTML)
+                status = make_status(likes, StoryUrl)
+                send_to_telegram(message=status)
             else:
                 deadend = True
                 return
@@ -106,9 +95,41 @@ def get_tweets(api, username):
             page+=1
             time.sleep(5)
 
+def get_tweet_details(tweet):
 
-with open('users.yaml','r') as userlist:
-    out=yaml.load(userlist)
-    for data in out:
-        print "Tweets/Retweets by @" +data+ " in the past 24 hours."
-        get_tweets(api, data)
+    screen_name = API.get_user(tweet.user.id_str).screen_name
+    tweet_id = tweet.id_str
+    return screen_name, tweet_id
+
+
+def make_status(tw_handle, full_text, likes, tweet, StoryUrl):
+
+    status = ist_date.strftime(fmt)
+
+    tweet_text = "\n" + tw_handle
+
+    if tweet_type == 'retweet':
+        tweet_text += "\n"+ tweet._json['retweeted_status']['full_text']
+    else:
+        tweet_text += "\n"+ tweet.full_text
+        
+    status += tweet_text    
+    status += ("\nLikes:") + str(likes) +"\n"
+    status += str(tweet.display_text_range)
+    status += StoryUrl
+
+def send_to_telegram(message): 
+    BOT.send_message(chat_id="@ReTweet_channel", text=message, parse_mode=telegram.ParseMode.HTML )  
+
+
+def read_user_conf():
+    with open(CONFIG_FILE, 'r') as userlist:
+        out=yaml.load(userlist)
+        return out
+
+if __name__ == '__main__':
+    users = read_user_conf()
+
+    for user in users:
+        print "Tweets/Retweets by @" + user + " in the past 24 hours."
+        get_tweets(user)
